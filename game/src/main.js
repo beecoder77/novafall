@@ -1,0 +1,150 @@
+// NOVAFALL — Siege of the Last Orbital.
+// Boot, the game state machine and the frame loop. All rules live in the
+// sibling modules; this file wires them together and owns the run state.
+
+import { VIEW_W, VIEW_H } from './config.js';
+import { makeRandom } from './random.js';
+import { createInput } from './input.js';
+import { createAudio } from './audio.js';
+import { makeStarfield, drawBackdrop, updateEffects, drawEffects, spawnBurst, spawnRing } from './effects.js';
+import { createPlayer, updatePlayer, drawPlayer } from './player.js';
+import { updateEnemies, drawEnemies } from './enemies.js';
+import { updateCombat, drawCombat } from './combat.js';
+import { startWave, updateWaves } from './waves.js';
+import { drawHUD } from './hud.js';
+import { drawTitle, drawPause, drawGameOver, drawVictory, START_BUTTON } from './screens.js';
+import { poseShot } from './shots.js';
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+canvas.width = VIEW_W;
+canvas.height = VIEW_H;
+
+const G = {
+  state: 'title',
+  time: 0, frame: 0, elapsed: 0,
+  score: 0, combo: 0, comboT: 0, kills: 0,
+  wave: 0, spawnQueue: [], spawnTimer: 0, spawnGap: 1,
+  bannerText: '', bannerTimer: 0, bossActive: false,
+  shake: 0, deathTimer: -1, deathBurstDone: false,
+  player: createPlayer(),
+  enemies: [], bullets: [], ebullets: [], parts: [], rings: [], texts: [], pickups: [],
+  rng: makeRandom((Math.random() * 1e9) | 0),
+  input: createInput(canvas),
+  audio: createAudio(),
+  starfield: null,
+  shotMode: false,
+};
+G.starfield = makeStarfield(G.rng);
+
+function resetRun() {
+  G.player = createPlayer();
+  G.enemies = []; G.bullets = []; G.ebullets = [];
+  G.parts = []; G.rings = []; G.texts = []; G.pickups = [];
+  G.score = 0; G.combo = 0; G.comboT = 0; G.kills = 0; G.elapsed = 0;
+  G.shake = 0; G.deathTimer = -1; G.deathBurstDone = false;
+  G.state = 'playing';
+  startWave(G, 1);
+}
+
+function update(dt) {
+  G.time += dt;
+  if (G.input.wasPressed('KeyM')) G.audio.toggleMute();
+
+  if (G.state === 'title') {
+    updateEffects(G, dt);
+    if (G.input.wasPressed('Enter') || G.input.clicked && drawTitleHit()) startRun();
+    return;
+  }
+  if (G.state === 'gameover' || G.state === 'victory') {
+    updateEffects(G, dt);
+    if (G.input.wasPressed('KeyR') || G.input.wasPressed('Enter')) resetRun();
+    return;
+  }
+  if (G.state === 'paused') {
+    if (G.input.wasPressed('KeyP') || G.input.wasPressed('Escape')) G.state = 'playing';
+    return;
+  }
+  // playing
+  if (G.input.wasPressed('KeyP') || G.input.wasPressed('Escape')) { G.state = 'paused'; return; }
+  G.elapsed += dt;
+  updatePlayer(G, dt);
+  updateEnemies(G, dt);
+  updateCombat(G, dt);
+  updateWaves(G, dt);
+  updateEffects(G, dt);
+  G.shake = Math.max(0, G.shake - dt * 26);
+  if (!G.player.alive && G.deathTimer < 0) {
+    G.deathTimer = 1.25;
+    if (!G.deathBurstDone) {
+      G.deathBurstDone = true;
+      spawnBurst(G.parts, G.rng, G.player.x, G.player.y, '#67e8f9', 60, 420, 1.1, 4);
+      spawnBurst(G.parts, G.rng, G.player.x, G.player.y, '#f8fafc', 24, 260, 0.8, 3);
+      spawnRing(G.rings, G.player.x, G.player.y, '#67e8f9', 150);
+    }
+  }
+  if (G.deathTimer > 0) {
+    G.deathTimer -= dt;
+    if (G.deathTimer <= 0) {
+      G.state = 'gameover';
+      G.audio.gameOver();
+    }
+  }
+}
+
+// The title screen's button is drawn by screens.js; main only needs its box.
+function overButton(b) {
+  return G.input.mouseX >= b.x && G.input.mouseX <= b.x + b.w && G.input.mouseY >= b.y && G.input.mouseY <= b.y + b.h;
+}
+function drawTitleHit() { return overButton(START_BUTTON); }
+function startRun() { G.audio.unlock(); resetRun(); }
+
+function render() {
+  ctx.save();
+  if (G.shake > 0.2) {
+    ctx.translate((Math.random() - 0.5) * G.shake, (Math.random() - 0.5) * G.shake);
+  }
+  drawBackdrop(ctx, G.starfield, G.time);
+  drawCombat(ctx, G);
+  drawEnemies(ctx, G);
+  drawPlayer(ctx, G);
+  drawEffects(ctx, G);
+  ctx.restore();
+
+  if (G.state === 'playing' || G.state === 'paused') drawHUD(ctx, G);
+  if (G.state === 'title') {
+    if (drawTitle(ctx, G) && !G.shotMode) startRun();
+  } else if (G.state === 'paused') {
+    drawPause(ctx, G);
+  } else if (G.state === 'gameover') {
+    if (drawGameOver(ctx, G) && !G.shotMode) resetRun();
+  } else if (G.state === 'victory') {
+    if (drawVictory(ctx, G) && !G.shotMode) resetRun();
+  }
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.033, (now - last) / 1000);
+  last = now;
+  G.frame += 1;
+  if (G.shotMode) {
+    // Posed scene: keep the backdrop and particles alive, freeze the play.
+    G.time += dt;
+    updateEffects(G, dt);
+  } else {
+    update(dt);
+  }
+  render();
+  G.input.endFrame();
+  requestAnimationFrame(frame);
+}
+
+// Screenshot posing: ?shot=title|play|boss|end&seed=n
+const params = new URLSearchParams(location.search);
+if (params.has('shot')) {
+  G.shotMode = true;
+  poseShot(G, params.get('shot'), parseInt(params.get('seed') || '1', 10) || 1);
+}
+
+requestAnimationFrame(frame);

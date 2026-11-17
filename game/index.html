@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NOVAFALL — Siege of the Last Orbital</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='%23070b1d'/%3E%3Cpath d='M16 4 L22 24 L16 19 L10 24 Z' fill='%2367e8f9'/%3E%3C/svg%3E">
+<style>
+  html, body {
+    margin: 0; padding: 0; min-height: 100%;
+    background: #05070f;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+  }
+  #wrap { padding: 18px; text-align: center; }
+  canvas {
+    width: min(96vw, 1280px); height: auto;
+    border: 1px solid rgba(103, 232, 249, 0.35);
+    border-radius: 10px;
+    box-shadow: 0 0 44px rgba(56, 89, 199, 0.45), 0 0 120px rgba(14, 116, 144, 0.25);
+    background: #070b1d;
+    cursor: crosshair;
+  }
+  #hint { color: #64748b; font-size: 13px; margin-top: 10px; letter-spacing: 0.04em; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game" width="1280" height="720"></canvas>
+  <div id="hint">NOVAFALL · WASD move · mouse aim · click / space fire · shift dash · P pause · M mute</div>
+</div>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
