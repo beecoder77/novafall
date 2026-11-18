@@ -3,6 +3,7 @@
 
 import { WAVE_TABLE, FINAL_WAVE } from './config.js';
 import { spawnAtEdge } from './enemies.js';
+import { openUpgradeScreen, relicOwned } from './upgrades.js';
 
 export function buildWaveQueue(wave) {
   const spec = WAVE_TABLE[Math.min(wave, FINAL_WAVE) - 1];
@@ -34,6 +35,10 @@ export function startWave(G, wave) {
   G.bannerText = wave === FINAL_WAVE ? `FINAL WAVE ${wave}` : `WAVE ${wave}`;
   G.bannerTimer = 2.2;
   G.bossActive = queue.includes('boss');
+  // A fresh wave resets the relic-forge counter; AEGIS PLATE raises a
+  // shield as the wave begins.
+  G.waveCores = 0;
+  if (relicOwned(G, 'aegis')) G.player.shieldTimer = Math.max(G.player.shieldTimer, 12);
 }
 
 export function updateWaves(G, dt) {
@@ -52,8 +57,9 @@ export function updateWaves(G, dt) {
       G.state = 'victory';
       G.audio.victory();
     } else {
-      G.audio.waveClear();
-      startWave(G, G.wave + 1);
+      // Between waves the run pauses on the upgrade draft; the draft
+      // starts the next wave once a card is picked.
+      openUpgradeScreen(G);
     }
   }
 }

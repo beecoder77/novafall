@@ -1,6 +1,6 @@
 // A zero-dependency static server for play-testing the game locally.
 //   node serve.ts        then open http://localhost:8080
-// Screenshot scenes: http://localhost:8080/?shot=play&seed=1 (title|play|boss|end)
+// Screenshot scenes: http://localhost:8080/?shot=play&seed=1 (title|play|boss|upgrade|end)
 
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';

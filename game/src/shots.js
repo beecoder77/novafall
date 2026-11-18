@@ -8,6 +8,10 @@ import { VIEW_W, VIEW_H } from './config.js';
 import { makeStarfield, spawnBurst } from './effects.js';
 import { spawnEnemy } from './enemies.js';
 import { makeRandom } from './random.js';
+import { UPGRADE_DEFS, RELIC_DEFS, upgradeCardRects } from './upgrades.js';
+
+function def(id) { return UPGRADE_DEFS.find((d) => d.id === id); }
+function relic(id) { return RELIC_DEFS.find((d) => d.id === id); }
 
 function baseScene(G, seed) {
   G.rng = makeRandom(seed * 7919 + 13);
@@ -25,6 +29,16 @@ function baseScene(G, seed) {
   G.bossesDown = 0;
   G.maxCombo = 0;
   G.coresCollected = { repair: 0, rapid: 0, shield: 0 };
+  G.waveCores = 0;
+  G.upgrades = [];
+  G.relics = [];
+  G.upgradeChoices = null;
+  G.forgedRelic = null;
+  G.upgradeCardBoxes = null;
+  // Player progression stats are reset with the scene; poses set them.
+  const pl = G.player;
+  pl.damageMult = 1; pl.fireIntervalMult = 1; pl.speedMult = 1; pl.comboMult = 1;
+  pl.multishot = 0; pl.pierce = 0; pl.magnetRadius = 0; pl.maxHull = 100; pl.rapidTimer = 0; pl.shieldTimer = 0;
 }
 
 function bullet(G, x, y, vx, vy, friendly = true) {
@@ -64,6 +78,9 @@ export function poseShot(G, name, seed) {
     G.wave = 6; G.score = 21400; G.best = 51200; G.combo = 5; G.comboT = 2.0;
     G.maxCombo = 7; G.kills = 83; G.elapsed = 214; G.bossesDown = 1;
     G.coresCollected = { repair: 1, rapid: 2, shield: 0 };
+    G.upgrades = [{ id: 'damage', n: 1 }, { id: 'speed', n: 1 }];
+    G.relics = ['salvage'];
+    p.damageMult = 1.25; p.speedMult = 1.12; p.magnetRadius = 240;
     p.x = 430; p.y = 470; p.hull = 82; p.angle = -0.9; p.rapidTimer = 4;
     const foes = [
       ['weaver', 760, 250], ['weaver', 900, 300], ['weaver', 620, 180],
@@ -106,6 +123,13 @@ export function poseShot(G, name, seed) {
     G.wave = 10; G.score = 48750; G.best = 51200; G.combo = 8; G.comboT = 2.2;
     G.maxCombo = 8; G.kills = 168; G.elapsed = 322; G.bossesDown = 1;
     G.coresCollected = { repair: 2, rapid: 1, shield: 1 };
+    G.upgrades = [
+      { id: 'damage', n: 2 }, { id: 'multishot', n: 1 },
+      { id: 'firerate', n: 1 }, { id: 'hull', n: 1 },
+    ];
+    G.relics = ['nova', 'aegis'];
+    p.damageMult = 1.25 * 1.25 * 1.2; p.multishot = 1; p.fireIntervalMult = 0.88;
+    p.maxHull = 125;
     G.bossActive = true;
     p.x = 640; p.y = 585; p.hull = 58; p.angle = -Math.PI / 2;
     p.shieldTimer = 6; p.rapidTimer = 5;
@@ -153,11 +177,47 @@ export function poseShot(G, name, seed) {
     pickup(G, 900, 580, 'shield', '#67e8f9', 'O');
     return;
   }
+  if (name === 'upgrade') {
+    // Wave 4 just cleared: the draft is open over the aftermath — a relic
+    // was forged from the cores gathered this wave, three cards to choose.
+    G.state = 'upgrade';
+    G.wave = 4; G.score = 18200; G.best = 51200; G.combo = 4; G.comboT = 1.8;
+    G.maxCombo = 7; G.kills = 61; G.elapsed = 168; G.bossesDown = 0;
+    G.coresCollected = { repair: 2, rapid: 1, shield: 1 };
+    G.waveCores = 4;
+    G.upgrades = [{ id: 'damage', n: 1 }, { id: 'speed', n: 1 }];
+    G.relics = ['nova'];
+    p.damageMult = 1.25 * 1.2; p.speedMult = 1.12;
+    p.x = 640; p.y = 612; p.hull = 74; p.angle = -Math.PI / 2;
+    const foes = [
+      ['weaver', 300, 240], ['drifter', 980, 260], ['mite', 480, 200],
+      ['gunner', 1080, 420], ['splitter', 200, 420], ['drifter', 860, 180],
+    ];
+    for (const [kind, x, y] of foes) spawnEnemy(G, kind, x, y);
+    // Stragglers dying as the wave ends.
+    spawnBurst(G.parts, G.rng, 300, 240, '#f472b6', 26, 300, 4.5, 3.5);
+    spawnBurst(G.parts, G.rng, 980, 260, '#fb923c', 22, 280, 4.5, 3.5);
+    longRing(G, 300, 240, '#f472b6', 90);
+    longText(G, 300, 208, '+320', '#fbbf24', 20);
+    longText(G, 980, 228, '+200', '#e2e8f0', 16);
+    pickup(G, 520, 640, 'repair', '#34d399', '+');
+    pickup(G, 780, 640, 'shield', '#67e8f9', 'O');
+    // The forged relic and the three draft cards.
+    G.forgedRelic = relic('chrono');
+    G.upgradeChoices = [def('multishot'), def('hull'), def('firerate')];
+    G.upgradeCardBoxes = upgradeCardRects();
+    return;
+  }
   // 'end' — the victory results screen over a calm field.
   G.state = 'victory';
   G.wave = 10; G.score = 62400; G.best = 62400; G.newBest = true;
   G.kills = 214; G.elapsed = 386; G.bossesDown = 2; G.maxCombo = 8;
   G.coresCollected = { repair: 3, rapid: 2, shield: 2 };
+  G.upgrades = [
+    { id: 'damage', n: 3 }, { id: 'multishot', n: 2 }, { id: 'firerate', n: 2 },
+    { id: 'pierce', n: 1 }, { id: 'hull', n: 1 },
+  ];
+  G.relics = ['nova', 'chrono', 'aegis'];
   p.x = VIEW_W / 2; p.y = VIEW_H / 2 + 170; p.angle = -Math.PI / 2;
   spawnBurst(G.parts, G.rng, 380, 220, '#34d399', 18, 150, 3.0, 3);
   spawnBurst(G.parts, G.rng, 900, 200, '#fbbf24', 18, 150, 3.0, 3);

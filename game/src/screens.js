@@ -2,6 +2,7 @@
 // victory results. Each draws its own call to action and restart control.
 
 import { VIEW_W, VIEW_H, COLORS, FINAL_WAVE } from './config.js';
+import { upgradeDef, relicDef } from './upgrades.js';
 
 function centre(ctx, text, y, font, color, glow = 0) {
   ctx.textAlign = 'center';
@@ -29,7 +30,7 @@ function button(ctx, G, x, y, w, h, label) {
 }
 
 export const START_BUTTON = { x: VIEW_W / 2 - 130, y: 470, w: 260, h: 56 };
-export const RESTART_BUTTON = { x: VIEW_W / 2 - 130, y: 500, w: 260, h: 56 };
+export const RESTART_BUTTON = { x: VIEW_W / 2 - 130, y: 524, w: 260, h: 56 };
 
 export function drawTitle(ctx, G) {
   ctx.fillStyle = 'rgba(3,6,18,0.45)';
@@ -39,7 +40,8 @@ export function drawTitle(ctx, G) {
   centre(ctx, '— SIEGE OF THE LAST ORBITAL —', 262 + bob, "600 21px 'Segoe UI', system-ui, sans-serif", '#67e8f9');
   centre(ctx, `Hold the line through ${FINAL_WAVE} waves of the swarm. Chain kills to raise your combo,`, 330, "400 18px 'Segoe UI', system-ui, sans-serif", COLORS.text);
   centre(ctx, 'grab repair, rapid-fire and shield cores, and bring down two Dreadnoughts.', 356, "400 18px 'Segoe UI', system-ui, sans-serif", COLORS.text);
-  centre(ctx, 'WASD / ARROWS move · MOUSE aim · CLICK or SPACE fire · SHIFT dash · P pause · M mute', 404, "600 16px 'Segoe UI', system-ui, sans-serif", COLORS.textDim);
+  centre(ctx, 'Between waves, draft 1 of 3 upgrades — and cores you collect forge relics.', 384, "600 16px 'Segoe UI', system-ui, sans-serif", COLORS.accent);
+  centre(ctx, 'WASD / ARROWS move · MOUSE aim · CLICK or SPACE fire · SHIFT dash · P pause · M mute', 414, "600 16px 'Segoe UI', system-ui, sans-serif", COLORS.textDim);
   const clicked = button(ctx, G, START_BUTTON.x, START_BUTTON.y, START_BUTTON.w, START_BUTTON.h, 'LAUNCH DEFENSE');
   centre(ctx, 'or press ENTER', 556, "400 14px 'Segoe UI', system-ui, sans-serif", COLORS.textDim);
   centre(ctx, `BEST SCORE  ${String(G.best || 0).padStart(7, '0')}`, 594, "700 15px 'Segoe UI', system-ui, sans-serif", COLORS.accent);
@@ -61,19 +63,27 @@ function resultsPanel(ctx, G, title, titleColor, subtitle) {
   ctx.font = "700 24px 'Segoe UI', system-ui, sans-serif";
   ctx.fillStyle = COLORS.text;
   ctx.textAlign = 'center';
-  ctx.fillText(`SCORE  ${G.score}`, VIEW_W / 2, 340);
+  ctx.fillText(`SCORE  ${G.score}`, VIEW_W / 2, 336);
   ctx.font = "400 19px 'Segoe UI', system-ui, sans-serif";
   ctx.fillStyle = COLORS.textDim;
-  ctx.fillText(`Waves cleared: ${G.state === 'victory' ? FINAL_WAVE : G.wave - 1} of ${FINAL_WAVE}   ·   Kills: ${G.kills}   ·   Time: ${G.elapsed.toFixed(0)}s`, VIEW_W / 2, 380);
+  ctx.fillText(`Waves cleared: ${G.state === 'victory' ? FINAL_WAVE : G.wave - 1} of ${FINAL_WAVE}   ·   Kills: ${G.kills}   ·   Time: ${G.elapsed.toFixed(0)}s`, VIEW_W / 2, 372);
   const cores = G.coresCollected || { repair: 0, rapid: 0, shield: 0 };
   ctx.font = "600 17px 'Segoe UI', system-ui, sans-serif";
   ctx.fillStyle = COLORS.text;
-  ctx.fillText(`BEST  ${G.best || 0}${G.newBest ? '   ★ NEW BEST ★' : ''}`, VIEW_W / 2, 416);
+  ctx.fillText(`BEST  ${G.best || 0}${G.newBest ? '   ★ NEW BEST ★' : ''}`, VIEW_W / 2, 406);
   ctx.font = "400 17px 'Segoe UI', system-ui, sans-serif";
   ctx.fillStyle = COLORS.textDim;
-  ctx.fillText(`Cores: repair x${cores.repair} · rapid x${cores.rapid} · shield x${cores.shield}      Best combo x${G.maxCombo || 0}`, VIEW_W / 2, 448);
+  ctx.fillText(`Cores: repair x${cores.repair} · rapid x${cores.rapid} · shield x${cores.shield}      Best combo x${G.maxCombo || 0}`, VIEW_W / 2, 438);
+  // The run's build: every drafted upgrade and every forged relic.
+  const ups = (G.upgrades || []).map((u) => `${upgradeDef(u.id).name} x${u.n}`).join('  ·  ');
+  const rels = (G.relics || []).map((id) => relicDef(id).name).join('  ·  ');
+  ctx.font = "600 16px 'Segoe UI', system-ui, sans-serif";
+  ctx.fillStyle = COLORS.text;
+  ctx.fillText(`Upgrades: ${ups || 'none drafted'}`, VIEW_W / 2, 468);
+  ctx.fillStyle = '#fbbf24';
+  ctx.fillText(`Relics: ${rels || 'none forged'}`, VIEW_W / 2, 494);
   const clicked = button(ctx, G, RESTART_BUTTON.x, RESTART_BUTTON.y, RESTART_BUTTON.w, RESTART_BUTTON.h, 'PLAY AGAIN');
-  centre(ctx, 'or press R', 586, "400 14px 'Segoe UI', system-ui, sans-serif", COLORS.textDim);
+  centre(ctx, 'or press R', 606, "400 14px 'Segoe UI', system-ui, sans-serif", COLORS.textDim);
   return clicked;
 }
 

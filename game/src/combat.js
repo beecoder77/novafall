@@ -1,11 +1,12 @@
 // Combat resolution: bullet flight, circle collisions, kill scoring with the
 // combo multiplier, splitter spawns, and the three pickup types.
 
-import { VIEW_W, VIEW_H, COMBO_WINDOW, COMBO_MAX } from './config.js';
+import { VIEW_W, VIEW_H, COMBO_MAX } from './config.js';
 import { spawnBurst, spawnRing, spawnText } from './effects.js';
 import { spawnEnemy, spawnAtEdge } from './enemies.js';
 import { damagePlayer } from './player.js';
 import { randRange } from './random.js';
+import { comboWindow } from './upgrades.js';
 
 const PICKUP_KINDS = [
   { kind: 'repair', color: '#34d399', label: '+' },
@@ -25,7 +26,7 @@ export function killEnemy(G, e) {
   G.enemies.splice(idx, 1);
   G.combo = Math.min(COMBO_MAX, G.combo + (G.comboT > 0 ? 1 : 0) || 1);
   if (G.comboT <= 0) G.combo = 1;
-  G.comboT = COMBO_WINDOW;
+  G.comboT = comboWindow(G);
   G.maxCombo = Math.max(G.maxCombo, G.combo);
   const gained = e.score * G.combo;
   G.score += gained;
@@ -63,17 +64,26 @@ export function updateCombat(G, dt) {
   G.ebullets = G.ebullets.filter((b) => !off(b));
 
   // Player bullets vs enemies (iterate backwards for safe removal).
+  // A piercing round keeps flying after a hit but never hurts the same
+  // enemy twice — the hit set tracks what it already passed through.
   for (let bi = G.bullets.length - 1; bi >= 0; bi--) {
     const b = G.bullets[bi];
+    b.hit = b.hit || new Set();
     let consumed = false;
     for (const e of [...G.enemies]) {
+      if (b.hit.has(e.id)) continue;
       if (Math.hypot(e.x - b.x, e.y - b.y) < e.radius + b.radius) {
-        e.hull -= 1;
+        b.hit.add(e.id);
+        e.hull -= b.dmg || 1;
         e.hurtFlash = 1;
-        consumed = true;
         spawnBurst(G.parts, G.rng, b.x, b.y, '#fde68a', 4, 150, 0.3, 2);
         if (e.hull <= 0) killEnemy(G, e);
-        break;
+        if ((b.pierce || 0) > 0) {
+          b.pierce -= 1;
+        } else {
+          consumed = true;
+          break;
+        }
       }
     }
     if (consumed) G.bullets.splice(bi, 1);
@@ -99,12 +109,20 @@ export function updateCombat(G, dt) {
     }
   }
 
-  // Pickups.
+  // Pickups. TRACTOR COIL / SALVAGE CORE pulls them toward the ship.
   for (let i = G.pickups.length - 1; i >= 0; i--) {
     const pk = G.pickups[i];
     pk.age += dt;
     pk.life -= dt;
     if (pk.life <= 0) { G.pickups.splice(i, 1); continue; }
+    if (p.alive && p.magnetRadius > 0) {
+      const dx = p.x - pk.x, dy = p.y - pk.y;
+      const d = Math.hypot(dx, dy) || 1;
+      if (d < p.magnetRadius && d > 4) {
+        pk.x += (dx / d) * 300 * dt;
+        pk.y += (dy / d) * 300 * dt;
+      }
+    }
     if (p.alive && Math.hypot(pk.x - p.x, pk.y - p.y) < pk.radius + p.radius + 4) {
       G.pickups.splice(i, 1);
       applyPickup(G, pk);
@@ -116,6 +134,8 @@ function applyPickup(G, pk) {
   const p = G.player;
   G.audio.pickup();
   G.coresCollected[pk.kind] = (G.coresCollected[pk.kind] || 0) + 1;
+  // Cores gathered this wave (per-wave stat; the forge counts run total).
+  G.waveCores = (G.waveCores || 0) + 1;
   spawnRing(G.rings, pk.x, pk.y, pk.color, 46);
   if (pk.kind === 'repair') {
     p.hull = Math.min(p.maxHull, p.hull + 30);

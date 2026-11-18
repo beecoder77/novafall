@@ -3,6 +3,7 @@
 // indicators, the boss health bar, and the centre wave banner.
 
 import { VIEW_W, VIEW_H, COLORS, FINAL_WAVE } from './config.js';
+import { comboWindow, upgradeDef, relicDef } from './upgrades.js';
 
 function bar(ctx, x, y, w, h, frac, color, back = 'rgba(15,23,42,0.8)') {
   ctx.fillStyle = back;
@@ -51,27 +52,62 @@ export function drawHUD(ctx, G) {
   ctx.fillStyle = COLORS.textDim;
   ctx.fillText(`DREADNOUGHTS ${G.bossesDown || 0} / 2 sunk   ·   LOSE — hull hits 0`, 32, 154);
 
-  // Wave counter, top centre, with a progress dot per wave.
-  ctx.textAlign = 'center';
-  ctx.fillStyle = COLORS.textDim;
-  ctx.font = `600 13px ${FONT}`;
-  ctx.fillText('WAVE', VIEW_W / 2, 30);
-  ctx.fillStyle = COLORS.text;
-  ctx.font = `800 26px ${FONT}`;
-  ctx.fillText(`${G.wave} / ${FINAL_WAVE}`, VIEW_W / 2, 60);
-  const dotGap = 15;
-  const dotsW = (FINAL_WAVE - 1) * dotGap;
-  for (let i = 0; i < FINAL_WAVE; i++) {
-    const dx = VIEW_W / 2 - dotsW / 2 + i * dotGap;
-    const dy = 76;
-    ctx.beginPath();
-    ctx.arc(dx, dy, 4, 0, Math.PI * 2);
-    if (i < G.wave - 1) { ctx.fillStyle = COLORS.accent; ctx.fill(); }
-    else if (i === G.wave - 1) { ctx.fillStyle = '#f8fafc'; ctx.fill(); }
-    else { ctx.strokeStyle = 'rgba(148,163,184,0.6)'; ctx.lineWidth = 1; ctx.stroke(); }
+  // Active upgrades: the draft picks so far, one row per upgrade. Hidden
+  // on the draft screen itself, where the three cards occupy the same
+  // space and already show each owned level (OWNED xN + pips).
+  const owned = G.upgrades || [];
+  if (owned.length > 0 && G.state !== 'upgrade') {
+    const rowH = 20;
+    const ph = 30 + owned.length * rowH + 8;
+    const py = 184;
+    panel(ctx, 20, py, 336, ph);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = COLORS.accent;
+    ctx.font = `800 11px ${FONT}`;
+    ctx.fillText('UPGRADES', 32, py + 18);
+    ctx.font = `600 13px ${FONT}`;
+    owned.forEach((u, i) => {
+      const def = upgradeDef(u.id);
+      if (!def) return;
+      const y = py + 38 + i * rowH;
+      ctx.fillStyle = def.color;
+      ctx.font = `700 14px ${FONT}`;
+      ctx.fillText(def.icon, 32, y);
+      ctx.fillStyle = COLORS.text;
+      ctx.fillText(def.name, 52, y);
+      ctx.textAlign = 'right';
+      ctx.fillStyle = COLORS.textDim;
+      ctx.fillText(`x${u.n}`, 344, y);
+      ctx.textAlign = 'left';
+    });
   }
 
-  if (G.combo >= 2) {
+  // Wave counter, top centre, with a progress dot per wave. Hidden on the
+  // draft screen, where the "WAVE n CLEARED" title carries the same info.
+  if (G.state !== 'upgrade') {
+    ctx.textAlign = 'center';
+    ctx.fillStyle = COLORS.textDim;
+    ctx.font = `600 13px ${FONT}`;
+    ctx.fillText('WAVE', VIEW_W / 2, 30);
+    ctx.fillStyle = COLORS.text;
+    ctx.font = `800 26px ${FONT}`;
+    ctx.fillText(`${G.wave} / ${FINAL_WAVE}`, VIEW_W / 2, 60);
+    const dotGap = 15;
+    const dotsW = (FINAL_WAVE - 1) * dotGap;
+    for (let i = 0; i < FINAL_WAVE; i++) {
+      const dx = VIEW_W / 2 - dotsW / 2 + i * dotGap;
+      const dy = 76;
+      ctx.beginPath();
+      ctx.arc(dx, dy, 4, 0, Math.PI * 2);
+      if (i < G.wave - 1) { ctx.fillStyle = COLORS.accent; ctx.fill(); }
+      else if (i === G.wave - 1) { ctx.fillStyle = '#f8fafc'; ctx.fill(); }
+      else { ctx.strokeStyle = 'rgba(148,163,184,0.6)'; ctx.lineWidth = 1; ctx.stroke(); }
+    }
+  }
+
+  // The combo meter is hidden on the draft screen, where the upgrade
+  // title occupies the same centre-top space.
+  if (G.combo >= 2 && G.state !== 'upgrade') {
     const pulse = 1 + 0.08 * Math.sin(G.time * 10);
     ctx.save();
     ctx.translate(VIEW_W / 2, 102);
@@ -80,7 +116,7 @@ export function drawHUD(ctx, G) {
     ctx.font = `800 21px ${FONT}`;
     ctx.fillText(`COMBO x${G.combo}`, 0, 0);
     ctx.restore();
-    bar(ctx, VIEW_W / 2 - 60, 112, 120, 5, G.comboT / 2.6, '#fbbf24');
+    bar(ctx, VIEW_W / 2 - 60, 112, 120, 5, G.comboT / comboWindow(G), '#fbbf24');
   }
 
   // Hull, bottom-left, with the numeric readout.
@@ -93,6 +129,33 @@ export function drawHUD(ctx, G) {
   ctx.fillStyle = COLORS.text;
   ctx.font = `700 14px ${FONT}`;
   ctx.fillText(`${Math.ceil(p.hull)}`, 258, VIEW_H - 23);
+
+  // Relic strip, bottom-right above the dash readout: one chip per forged
+  // relic, icon plus name so the run's permanent powers stay visible.
+  // It sits high enough to clear the three-line dash readout (top line
+  // can reach y 658 when shield and rapid are both active).
+  const relics = G.relics || [];
+  if (relics.length > 0) {
+    ctx.textAlign = 'right';
+    ctx.fillStyle = COLORS.textDim;
+    ctx.font = `600 11px ${FONT}`;
+    ctx.fillText('RELICS', VIEW_W - 20, VIEW_H - 118);
+    ctx.font = `700 12px ${FONT}`;
+    let rx = VIEW_W - 20;
+    for (let i = relics.length - 1; i >= 0; i--) {
+      const def = relicDef(relics[i]);
+      if (!def) continue;
+      const w = 24 + ctx.measureText(def.name).width + 16;
+      rx -= w;
+      panel(ctx, rx, VIEW_H - 110, w, 26);
+      ctx.fillStyle = def.color;
+      ctx.textAlign = 'left';
+      ctx.fillText(def.icon, rx + 10, VIEW_H - 92);
+      ctx.fillStyle = COLORS.text;
+      ctx.fillText(def.name, rx + 26, VIEW_H - 92);
+      rx -= 6;
+    }
+  }
 
   // Power-up and dash status, bottom-right.
   ctx.textAlign = 'right';

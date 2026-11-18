@@ -14,6 +14,7 @@ import { startWave, updateWaves } from './waves.js';
 import { drawHUD } from './hud.js';
 import { drawTitle, drawPause, drawGameOver, drawVictory, START_BUTTON } from './screens.js';
 import { poseShot } from './shots.js';
+import { chooseUpgrade, pickUpgradeAt, drawUpgradeScreen } from './upgrades.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -37,6 +38,8 @@ const G = {
   wave: 0, spawnQueue: [], spawnTimer: 0, spawnGap: 1,
   bannerText: '', bannerTimer: 0, bossActive: false, bossesDown: 0,
   coresCollected: { repair: 0, rapid: 0, shield: 0 },
+  waveCores: 0, upgrades: [], relics: [],
+  upgradeChoices: null, forgedRelic: null, upgradeCardBoxes: null,
   shake: 0, deathTimer: -1, deathBurstDone: false,
   player: createPlayer(),
   enemies: [], bullets: [], ebullets: [], parts: [], rings: [], texts: [], pickups: [],
@@ -55,6 +58,8 @@ function resetRun() {
   G.score = 0; G.combo = 0; G.comboT = 0; G.maxCombo = 0; G.kills = 0; G.elapsed = 0;
   G.bossesDown = 0; G.newBest = false; G.bestRecorded = false;
   G.coresCollected = { repair: 0, rapid: 0, shield: 0 };
+  G.waveCores = 0; G.upgrades = []; G.relics = [];
+  G.upgradeChoices = null; G.forgedRelic = null; G.upgradeCardBoxes = null;
   G.shake = 0; G.deathTimer = -1; G.deathBurstDone = false;
   G.state = 'playing';
   startWave(G, 1);
@@ -86,6 +91,23 @@ function update(dt) {
   }
   if (G.state === 'paused') {
     if (G.input.wasPressed('KeyP') || G.input.wasPressed('Escape')) G.state = 'playing';
+    return;
+  }
+  if (G.state === 'upgrade') {
+    // The draft pauses the fight: particles drift on, nothing else moves.
+    updateEffects(G, dt);
+    let pick = -1;
+    if (G.input.wasPressed('Digit1')) pick = 0;
+    else if (G.input.wasPressed('Digit2')) pick = 1;
+    else if (G.input.wasPressed('Digit3')) pick = 2;
+    else if (G.input.clicked) pick = pickUpgradeAt(G, G.input.mouseX, G.input.mouseY);
+    if (pick >= 0) {
+      const next = chooseUpgrade(G, pick);
+      if (next > 0) {
+        G.state = 'playing';
+        startWave(G, next);
+      }
+    }
     return;
   }
   // playing
@@ -134,7 +156,8 @@ function render() {
   drawEffects(ctx, G);
   ctx.restore();
 
-  if (G.state === 'playing' || G.state === 'paused') drawHUD(ctx, G);
+  if (G.state === 'playing' || G.state === 'paused' || G.state === 'upgrade') drawHUD(ctx, G);
+  if (G.state === 'upgrade') drawUpgradeScreen(ctx, G);
   if (G.state === 'title') {
     if (drawTitle(ctx, G) && !G.shotMode) startRun();
   } else if (G.state === 'paused') {
@@ -162,6 +185,10 @@ function frame(now) {
   G.input.endFrame();
   requestAnimationFrame(frame);
 }
+
+// Debug handle for automated play-testing (read-only state inspection;
+// the game itself never reads it).
+window.__NOVAFALL = G;
 
 // Screenshot posing: ?shot=title|play|boss|end&seed=n
 const params = new URLSearchParams(location.search);

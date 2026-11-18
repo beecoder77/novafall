@@ -67,6 +67,8 @@ export function createAudio() {
     dash: () => tone(300, 900, 0.14, 'sine', 0.16),
     pickup: () => { tone(660, 660, 0.07, 'sine', 0.18); tone(990, 990, 0.1, 'sine', 0.18, 0.07); },
     waveClear: () => { tone(523, 523, 0.1, 'triangle', 0.2); tone(659, 659, 0.1, 'triangle', 0.2, 0.1); tone(784, 784, 0.16, 'triangle', 0.22, 0.2); },
+    upgrade: () => { tone(440, 440, 0.09, 'square', 0.14); tone(660, 660, 0.09, 'square', 0.14, 0.09); tone(880, 880, 0.18, 'square', 0.16, 0.18); },
+    relic: () => { tone(523, 1046, 0.3, 'sine', 0.2); tone(784, 1568, 0.35, 'sine', 0.18, 0.12); },
     gameOver: () => { tone(392, 392, 0.2, 'triangle', 0.22); tone(311, 311, 0.2, 'triangle', 0.22, 0.2); tone(233, 120, 0.5, 'triangle', 0.24, 0.4); },
     victory: () => { tone(523, 523, 0.12, 'triangle', 0.2); tone(659, 659, 0.12, 'triangle', 0.2, 0.12); tone(784, 784, 0.12, 'triangle', 0.2, 0.24); tone(1046, 1046, 0.3, 'triangle', 0.24, 0.36); },
   };

@@ -16,6 +16,9 @@ export function createPlayer() {
     fireTimer: 0, dashTimer: 0, dashCooldown: 0,
     dashDirX: 0, dashDirY: 0,
     rapidTimer: 0, shieldTimer: 0, hurtFlash: 0, alive: true,
+    // Run progression from the upgrade draft and relics (upgrades.js).
+    damageMult: 1, fireIntervalMult: 1, speedMult: 1, comboMult: 1,
+    multishot: 0, pierce: 0, magnetRadius: 0,
   };
 }
 
@@ -45,8 +48,8 @@ export function updatePlayer(G, dt) {
     p.vx = p.dashDirX * PLAYER_SPEED * DASH_MULTIPLIER;
     p.vy = p.dashDirY * PLAYER_SPEED * DASH_MULTIPLIER;
   } else {
-    p.vx = mx * PLAYER_SPEED;
-    p.vy = my * PLAYER_SPEED;
+    p.vx = mx * PLAYER_SPEED * p.speedMult;
+    p.vy = my * PLAYER_SPEED * p.speedMult;
   }
   p.x = Math.min(VIEW_W - p.radius, Math.max(p.radius, p.x + p.vx * dt));
   p.y = Math.min(VIEW_H - p.radius, Math.max(p.radius, p.y + p.vy * dt));
@@ -58,19 +61,26 @@ export function updatePlayer(G, dt) {
 
   p.fireTimer -= dt;
   const firing = input.mouseDown || input.down('Space') || input.down('KeyJ');
-  const interval = p.rapidTimer > 0 ? RAPID_FIRE_INTERVAL : FIRE_INTERVAL;
+  const interval = (p.rapidTimer > 0 ? RAPID_FIRE_INTERVAL : FIRE_INTERVAL) * p.fireIntervalMult;
   if (firing && p.fireTimer <= 0) {
     p.fireTimer = interval;
+    const mkBullet = (ox, oy, angle) => ({
+      x: p.x + Math.cos(angle) * 16 + ox,
+      y: p.y + Math.sin(angle) * 16 + oy,
+      vx: Math.cos(angle) * BULLET_SPEED,
+      vy: Math.sin(angle) * BULLET_SPEED,
+      radius: 4, life: 1.1, friendly: true,
+      dmg: p.damageMult, pierce: p.pierce,
+    });
     for (const side of [-1, 1]) {
       const ox = Math.cos(p.angle + Math.PI / 2) * 7 * side;
       const oy = Math.sin(p.angle + Math.PI / 2) * 7 * side;
-      G.bullets.push({
-        x: p.x + Math.cos(p.angle) * 16 + ox,
-        y: p.y + Math.sin(p.angle) * 16 + oy,
-        vx: Math.cos(p.angle) * BULLET_SPEED,
-        vy: Math.sin(p.angle) * BULLET_SPEED,
-        radius: 4, life: 1.1, friendly: true,
-      });
+      G.bullets.push(mkBullet(ox, oy, p.angle));
+    }
+    // SPLIT BARREL: extra streams fanning out from the nose.
+    for (let k = 1; k <= p.multishot; k++) {
+      const off = (k % 2 === 1 ? 1 : -1) * Math.ceil(k / 2) * 0.1;
+      G.bullets.push(mkBullet(0, 0, p.angle + off));
     }
     G.audio.shoot();
   }
