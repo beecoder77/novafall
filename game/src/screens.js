@@ -42,6 +42,7 @@ export function drawTitle(ctx, G) {
   centre(ctx, 'WASD / ARROWS move · MOUSE aim · CLICK or SPACE fire · SHIFT dash · P pause · M mute', 404, "600 16px 'Segoe UI', system-ui, sans-serif", COLORS.textDim);
   const clicked = button(ctx, G, START_BUTTON.x, START_BUTTON.y, START_BUTTON.w, START_BUTTON.h, 'LAUNCH DEFENSE');
   centre(ctx, 'or press ENTER', 556, "400 14px 'Segoe UI', system-ui, sans-serif", COLORS.textDim);
+  centre(ctx, `BEST SCORE  ${String(G.best || 0).padStart(7, '0')}`, 594, "700 15px 'Segoe UI', system-ui, sans-serif", COLORS.accent);
   return clicked;
 }
 
@@ -64,6 +65,13 @@ function resultsPanel(ctx, G, title, titleColor, subtitle) {
   ctx.font = "400 19px 'Segoe UI', system-ui, sans-serif";
   ctx.fillStyle = COLORS.textDim;
   ctx.fillText(`Waves cleared: ${G.state === 'victory' ? FINAL_WAVE : G.wave - 1} of ${FINAL_WAVE}   ·   Kills: ${G.kills}   ·   Time: ${G.elapsed.toFixed(0)}s`, VIEW_W / 2, 380);
+  const cores = G.coresCollected || { repair: 0, rapid: 0, shield: 0 };
+  ctx.font = "600 17px 'Segoe UI', system-ui, sans-serif";
+  ctx.fillStyle = COLORS.text;
+  ctx.fillText(`BEST  ${G.best || 0}${G.newBest ? '   ★ NEW BEST ★' : ''}`, VIEW_W / 2, 416);
+  ctx.font = "400 17px 'Segoe UI', system-ui, sans-serif";
+  ctx.fillStyle = COLORS.textDim;
+  ctx.fillText(`Cores: repair x${cores.repair} · rapid x${cores.rapid} · shield x${cores.shield}      Best combo x${G.maxCombo || 0}`, VIEW_W / 2, 448);
   const clicked = button(ctx, G, RESTART_BUTTON.x, RESTART_BUTTON.y, RESTART_BUTTON.w, RESTART_BUTTON.h, 'PLAY AGAIN');
   centre(ctx, 'or press R', 586, "400 14px 'Segoe UI', system-ui, sans-serif", COLORS.textDim);
   return clicked;

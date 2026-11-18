@@ -20,12 +20,23 @@ const ctx = canvas.getContext('2d');
 canvas.width = VIEW_W;
 canvas.height = VIEW_H;
 
+const BEST_KEY = 'novafall-best';
+function loadBest() {
+  try { return Math.max(0, parseInt(localStorage.getItem(BEST_KEY) || '0', 10) || 0); }
+  catch { return 0; }
+}
+function saveBest(v) {
+  try { localStorage.setItem(BEST_KEY, String(v)); } catch { /* storage unavailable */ }
+}
+
 const G = {
   state: 'title',
   time: 0, frame: 0, elapsed: 0,
-  score: 0, combo: 0, comboT: 0, kills: 0,
+  score: 0, best: loadBest(), newBest: false, bestRecorded: false,
+  combo: 0, comboT: 0, maxCombo: 0, kills: 0,
   wave: 0, spawnQueue: [], spawnTimer: 0, spawnGap: 1,
-  bannerText: '', bannerTimer: 0, bossActive: false,
+  bannerText: '', bannerTimer: 0, bossActive: false, bossesDown: 0,
+  coresCollected: { repair: 0, rapid: 0, shield: 0 },
   shake: 0, deathTimer: -1, deathBurstDone: false,
   player: createPlayer(),
   enemies: [], bullets: [], ebullets: [], parts: [], rings: [], texts: [], pickups: [],
@@ -41,7 +52,9 @@ function resetRun() {
   G.player = createPlayer();
   G.enemies = []; G.bullets = []; G.ebullets = [];
   G.parts = []; G.rings = []; G.texts = []; G.pickups = [];
-  G.score = 0; G.combo = 0; G.comboT = 0; G.kills = 0; G.elapsed = 0;
+  G.score = 0; G.combo = 0; G.comboT = 0; G.maxCombo = 0; G.kills = 0; G.elapsed = 0;
+  G.bossesDown = 0; G.newBest = false; G.bestRecorded = false;
+  G.coresCollected = { repair: 0, rapid: 0, shield: 0 };
   G.shake = 0; G.deathTimer = -1; G.deathBurstDone = false;
   G.state = 'playing';
   startWave(G, 1);
@@ -50,6 +63,16 @@ function resetRun() {
 function update(dt) {
   G.time += dt;
   if (G.input.wasPressed('KeyM')) G.audio.toggleMute();
+
+  // A finished run banks its best score once, before the results screen draws.
+  if ((G.state === 'gameover' || G.state === 'victory') && !G.bestRecorded) {
+    G.bestRecorded = true;
+    if (G.score > G.best) {
+      G.best = G.score;
+      G.newBest = true;
+      saveBest(G.best);
+    }
+  }
 
   if (G.state === 'title') {
     updateEffects(G, dt);

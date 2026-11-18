@@ -26,6 +26,7 @@ export function killEnemy(G, e) {
   G.combo = Math.min(COMBO_MAX, G.combo + (G.comboT > 0 ? 1 : 0) || 1);
   if (G.comboT <= 0) G.combo = 1;
   G.comboT = COMBO_WINDOW;
+  G.maxCombo = Math.max(G.maxCombo, G.combo);
   const gained = e.score * G.combo;
   G.score += gained;
   G.kills += 1;
@@ -46,6 +47,7 @@ export function killEnemy(G, e) {
   if (e.kind === 'boss') {
     for (let i = 0; i < 3; i++) maybeDropPickup(G, e.x + randRange(G.rng, -70, 70), e.y + randRange(G.rng, -50, 50));
     G.bossActive = false;
+    G.bossesDown = (G.bossesDown || 0) + 1;
   }
 }
 
@@ -113,6 +115,7 @@ export function updateCombat(G, dt) {
 function applyPickup(G, pk) {
   const p = G.player;
   G.audio.pickup();
+  G.coresCollected[pk.kind] = (G.coresCollected[pk.kind] || 0) + 1;
   spawnRing(G.rings, pk.x, pk.y, pk.color, 46);
   if (pk.kind === 'repair') {
     p.hull = Math.min(p.maxHull, p.hull + 30);
